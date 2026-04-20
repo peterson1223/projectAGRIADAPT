@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AgriAdapt — Mid-Season ML Prediction & Nasho Infrastructure Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@400;500;700;800;900&family=Instrument+Serif:ital@0;1&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<!-- Geospatial Hub (Leaflet + shpjs + turf + geoman) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/shpjs@latest/dist/shp.js"></script>
+<script src="https://unpkg.com/@turf/turf/turf.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<!-- GeoTIFF.js for client-side satellite band analysis -->
+<script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-bundle/geotiff.js"></script>
+<link rel="stylesheet" href="style.css?v=6">
+<!-- FontAwesome for clear icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+<!-- BACKGROUND VIDEO -->
+<div class="video-container">
+  <video autoplay loop muted playsinline id="bg-video">
+    <source src="https://player.vimeo.com/external/434045526.sd.mp4?s=c27cf3419843c1ee20274ad0944a4d69101cc14e&profile_id=164&oauth2_token_id=57447761" type="video/mp4">
+  </video>
+  <div class="video-overlay"></div>
+</div>
+
+<div class="global-aura"></div>
+
+<!-- TOP BAR -->
+<header class="topbar glass">
+  <div class="logo">
+    <div class="logo-leaf" style="background:linear-gradient(135deg, #FBBF24, #FF8000);"><i class="fa-solid fa-solar-panel"></i></div>
+    <div>
+      <div class="logo-text">AGRIAdapt</div>
+      <div class="logo-sub">Kirehe District · Rwanda · District-Level ML Framework</div>
+    </div>
+  </div>
+  <div class="topbar-right" style="display:flex;align-items:center;gap:20px;">
+    <div class="toggle-group glass" style="padding:4px; border-radius:30px; display:flex; gap:4px;">
+      <button class="btn btn-mini active" onclick="setTheme('light')" id="t-light"><i class="fa-solid fa-sun"></i> Light</button>
+      <button class="btn btn-mini" onclick="setTheme('white')" id="t-white"><i class="fa-regular fa-sun"></i> White</button>
+      <button class="btn btn-mini" onclick="setTheme('dark')" id="t-dark"><i class="fa-solid fa-moon"></i> Dark</button>
+      <button class="btn btn-mini" onclick="setTheme('black')" id="t-black"><i class="fa-solid fa-cloud-moon"></i> Black</button>
+    </div>
+    <!-- Live Monitor Badge in topbar-right -->
+  <div id="monitor-badge" style="
+    display:flex; align-items:center; gap:8px;
+    font-family:var(--mono); font-size:9px; font-weight:700; letter-spacing:0.08em;
+    text-transform:uppercase; padding:6px 14px; border-radius:20px;
+    border:1px solid rgba(0,255,102,0.2); background:rgba(0,255,102,0.1);
+    color:var(--green); white-space:nowrap; transition:all 0.5s ease;
+  "><i class="fa-solid fa-circle-notch fa-spin"></i>&nbsp;Monitor Init…</div>
+  <button id="btn-play" class="btn btn-g" onclick="toggleSim()"><i class="fa-solid fa-play"></i> Auto-Play Season</button>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav class="nav glass">
+  <div class="nav-inner" style="overflow-x: auto; display: flex; flex-wrap: nowrap;">
+    <button class="ntab active" id="nb-inputs" onclick="tab('inputs')"><i class="fa-solid fa-satellite-dish"></i> Monitoring & Grid</button>
+    <button class="ntab" id="nb-risk"   onclick="tab('risk')"><i class="fa-solid fa-chart-line"></i> WRSI Prediction</button>
+    <button class="ntab" id="nb-ledger" onclick="tab('ledger')"><i class="fa-solid fa-users-viewfinder"></i> Member Success</button>
+    <button class="ntab" id="nb-analysis" onclick="tab('analysis')"><i class="fa-solid fa-chart-pie"></i> Member Analysis</button>
+    <button class="ntab" id="nb-export" onclick="tab('export')"><i class="fa-solid fa-file-pdf"></i> Reporting Hub</button>
+    <button class="ntab" id="nb-model"  onclick="tab('model')"><i class="fa-solid fa-microscope"></i> Validation Lab</button>
+    <button class="ntab" id="nb-map"    onclick="tab('map')"><i class="fa-solid fa-map-location-dot"></i> Asset Map</button>
+    <button class="ntab" id="nb-impact" onclick="tab('impact')"><i class="fa-solid fa-scale-balanced"></i> Economic ROI</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero glass-hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-tag"><i class="fa-solid fa-microscope"></i> Mid-Season ML Prediction · XGBoost 2001–2023</div>
+      <h1 class="hero-h1">Satisfying the<br><em>Maize WRSI Gap</em></h1>
+      <p class="hero-desc">
+        Using 22 seasons (2001–2023) of CHIRPS, ERA5-Land, and MODIS satellite data to predict end-of-season failure across Kirehe District, and leveraging the solar-powered irrigation nexus as the intervention to close the water requirement gap.
+      </p>
+      <div class="hero-stats">
+        <div class="hstat"><div class="hstat-val" id="h-wrsi-base">--</div><div class="hstat-lbl">Baseline WRSI</div></div>
+        <div class="hstat"><div class="hstat-val" id="h-wrsi-opt" style="color:var(--cyan);">--</div><div class="hstat-lbl">Optimized WRSI</div></div>
+        <div class="hstat"><div class="hstat-val">2001-23</div><div class="hstat-lbl">Kirehe Data Corpus</div></div>
+      </div>
+    </div>
+    
+    <div style="flex:1; max-width:500px; display:flex; flex-direction:column; gap:20px;">
+      <div class="card glass" style="padding:0; overflow:hidden; border:2px solid #FBBF24; box-shadow: 0 10px 40px rgba(0,0,0,0.4);">
+        <img src="nasho_center_pivot_irrigation_rwanda_1775829944977.png" style="width:100%; height:200px; object-fit:cover;">
+        <div style="padding:16px;">
+          <div class="sec-label" style="font-size:10px; margin-bottom:4px; color:#FBBF24;">OPERATIONAL SCALE</div>
+          <div style="font-family:var(--serif); font-size:18px;">63 Smart Irrigation Systems</div>
+          <div style="font-size:11px; color:var(--ink-soft); margin-top:4px;">1,173 hectares under high-precision climate-controlled sprinklers.</div>
+        </div>
+      </div>
+      
+      <div class="hero-orb" style="margin:0 auto;">
+      <svg class="orb-svg" viewBox="0 0 260 260">
+        <circle class="orb-bg" cx="130" cy="130" r="108"/>
+        <defs>
+          <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#00F0FF;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#0080FF;stop-opacity:1" />
+          </linearGradient>
+        </defs>
+        <circle class="orb-track" cx="130" cy="130" r="108"/>
+        <circle id="orb-fill" class="orb-fill" cx="130" cy="130" r="108"
+          stroke="url(#cyanGrad)" stroke-dasharray="678.6" stroke-dashoffset="678.6"/>
+        <text class="orb-num" id="orb-pct" x="130" y="115" text-anchor="middle" dy="0.35em" fill="white">--</text>
+        <text class="orb-unit" x="130" y="152" text-anchor="middle">SYSTEM HEALTH</text>
+        <text class="orb-status" id="orb-status" x="130" y="173" text-anchor="middle" fill="#00F0FF">Operational</text>
+      </svg>
+    </div>
+    </div>
+  </div>
+</section>
+
+<!-- PANELS -->
+<div class="wrap">
+  
+  <!-- INPUTS PANEL -->
+  <div id="p-inputs" class="panel active">
+    <!-- ALERT -->
+    <div class="alert a-info glass" id="sim-alert">
+      <span class="alert-icon"><i class="fa-solid fa-circle-info"></i></span>
+      <span id="sim-alert-text">
+        <strong>Two ways to use this dashboard:</strong><br>
+        1. <strong>Drag the sliders</strong> below — every recommendation and gauge updates instantly.<br>
+        2. Press <strong>"Auto-Play Season"</strong> above to watch the whole growing season unfold automatically.</span>
+    </div>
+
+    <!-- NARRATOR -->
+    <div id="narrator-box" class="card glass" style="margin-bottom:24px; border-left:3px solid #FBBF24; padding:0; display:flex; overflow:hidden;">
+      <div style="width:180px; flex-shrink:0;">
+          <img src="nasho_center_pivot_irrigation_rwanda_1775829944977.png" style="width:100%; height:100%; object-fit:cover;">
+      </div>
+      <div style="padding:20px; flex:1;">
+        <div class="sec-label" style="color:#FBBF24; margin-bottom:14px;"><i class="fa-solid fa-solar-panel"></i> System Health Narrator</div>
+        <div id="narrator-text" style="font-family:var(--serif); font-size:15px; line-height:1.8; color:rgba(255,255,255,0.85);">Checking Grid Status…</div>
+        <div id="narrator-why" style="margin-top:14px; padding:12px 16px; background:rgba(251,191,36,0.07); border-radius:8px; font-family:var(--mono); font-size:12px; color:#FBBF24; line-height:1.7;"></div>
+      </div>
+    </div>
+
+    <!-- Live Interventions (Mini-recs) -->
+    <div class="card glass" style="margin-bottom:24px; border-left: 3px solid var(--cyan);">
+      <div class="card-top ct-gold"></div>
+      <div class="sec-label" style="margin-bottom:16px;">
+        <i class="fa-solid fa-bell"></i> Live Interventions
+        <span id="rec-count-badge" style="margin-left:10px; font-size:11px; background:rgba(255,120,0,0.2); color:#FF8000; padding:3px 10px; border-radius:20px; font-family:var(--mono);">Loading…</span>
+      </div>
+      <div id="rec-list-main"></div>
+    </div>
+
+    <div class="g2">
+      <!-- Environmental Observations (Scientific) -->
+      <div class="card glass">
+        <div class="card-top ct-green"></div>
+        <div class="sec-label"><i class="fa-solid fa-cloud-sun-rain"></i> Environmental Monitoring (ML Features)</div>
+        <div class="sl-group">
+          <div class="sl-head"><i class="fa-solid fa-cloud-showers-heavy"></i> Seasonal Rainfall — CHIRPS v2.0</div>
+          <div class="sl-row">
+            <div class="sl-name"><strong>RF_CUMUL</strong><span>Cumulative mm to date</span></div>
+            <input type="range" id="rf_cumul" min="80" max="520" step="5" value="260" oninput="update()">
+            <span class="sl-val" id="v_rf_cumul">260 mm</span>
+          </div>
+          <div class="sl-row">
+            <div class="sl-name"><strong>CDD</strong><span>Consecutive dry days</span></div>
+            <input type="range" id="cdd" min="0" max="30" step="1" value="10" oninput="update()">
+            <span class="sl-val" id="v_cdd">10 d</span>
+          </div>
+        </div>
+        <div class="sl-group">
+          <div class="sl-head"><i class="fa-solid fa-droplet"></i> Surface Metrics — ERA5-Land/MODIS</div>
+          <div class="sl-row">
+            <div class="sl-name"><strong>SM_D8_rel</strong><span>Soil moisture relative depth</span></div>
+            <input type="range" id="sm_rel" min="0.30" max="1.40" step="0.01" value="0.82" oninput="update()">
+            <span class="sl-val" id="v_sm_rel">0.82</span>
+          </div>
+          <div class="sl-row">
+            <div class="sl-name"><strong>NDVI</strong><span>Vegetation canopy health</span></div>
+            <input type="range" id="ndvi" min="0.10" max="0.80" step="0.01" value="0.45" oninput="update()">
+            <span class="sl-val" id="v_ndvi">0.45</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Infrastructure Grid (Operational) -->
+      <div class="card glass">
+        <div class="card-top ct-cyan"></div>
+        <div class="sec-label"><i class="fa-solid fa-bolt"></i> AGRIAdapt Intervention Controls</div>
+        <div class="sl-group">
+          <div class="sl-head"><i class="fa-solid fa-sun"></i> Solar Performance — 3.3 MW Nexus</div>
+          <div class="sl-row">
+            <div class="sl-name"><strong>Grid Yield</strong><span>Available Power (MW)</span></div>
+            <input type="range" id="solar_mw" min="0" max="3.3" step="0.1" value="2.8" oninput="update()">
+            <span class="sl-val" id="v_solar_mw">2.8 MW</span>
+          </div>
+        </div>
+        <div class="sl-group">
+          <div class="sl-head"><i class="fa-solid fa-faucet-drip"></i> Kirehe Pumping Nexus</div>
+          <div class="sl-row">
+            <div class="sl-name"><strong>Active Sprinklers</strong><span>Operational Irrigation Units</span></div>
+            <input type="range" id="pivots_active" min="0" max="63" step="1" value="42" oninput="update()">
+            <span class="sl-val" id="v_pivots_active">42 Units</span>
+          </div>
+          <div class="sl-row">
+            <div class="sl-name"><strong>Reservoir</strong><span>Intake level (%)</span></div>
+            <input type="range" id="reservoir" min="0" max="100" step="1" value="95" oninput="update()">
+            <span class="sl-val" id="v_reservoir">95%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Progress Card -->
+    <div class="card glass" style="margin-top:24px;">
+      <div class="card-top ct-green"></div>
+      <div class="sec-label"><i class="fa-solid fa-calendar-days"></i> Seasonal Timeline (Dekads 4-12)</div>
+      <div class="sl-group">
+        <div class="sl-row">
+          <div class="sl-name"><strong>Current Dekad</strong><span>T4 (Planting) to T12 (Harvest)</span></div>
+          <input type="range" id="dekad" min="4" max="12" step="1" value="6" oninput="update()">
+          <span class="sl-val" id="v_dekad" style="font-size:24px;">D6</span>
+        </div>
+      </div>
+      <div class="prog-container" style="margin-top:20px;">
+        <div class="prog-track">
+          <div id="time-prog" class="prog-fill" style="width: 50%;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:8px;">
+          <span class="mono-text">D1</span>
+          <span class="mono-text" style="color:var(--cyan)">Dekad <span id="day-counter">6</span></span>
+          <span class="mono-text">D12 (Harvest)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Restored Nutrient Lab Integration -->
+    <div class="card glass" style="margin-top:24px; border-top:2px solid var(--gold);">
+        <div class="sec-label"><i class="fa-solid fa-flask-vial"></i> Nutrient Lab Diagnostic</div>
+        <div class="g2" style="margin-top:15px; gap:15px;">
+            <div class="inner-glass" style="padding:15px;">
+                <div style="font-size:10px; color:var(--ink-mute);">SOIL pH</div>
+                <input type="range" id="soil_ph" min="4.5" max="8.5" step="0.1" value="6.2" oninput="update()">
+                <div id="v_soil_ph" style="font-family:var(--mono); font-size:18px; margin-top:5px;">6.2</div>
+            </div>
+            <div class="inner-glass" style="padding:15px;">
+                <div style="font-size:10px; color:var(--ink-mute);">FERTILIZER STATUS</div>
+                <div id="nutrient-advice" style="font-size:11px; margin-top:5px; line-height:1.4;">Monitoring moisture for urea application window...</div>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- WRSI PREDICTION PANEL -->
+  <div id="p-risk" class="panel">
+    <div class="g2">
+      <div class="card glass" style="border-bottom: 3px solid #FF4F4F;">
+        <div class="card-top ct-gold"></div>
+        <div class="sec-label"><i class="fa-solid fa-cloud-showers-water"></i> Baseline WRSI (Rain-fed)</div>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px;">
+          <span id="wrsi-base-big" style="font-family:var(--cab);font-size:48px;font-weight:900;color:white;">--</span>
+          <span id="tag-base" class="ptag">--</span>
+        </div>
+        <p class="desc-text" style="font-size:11px;">Expected satisfaction index based purely on CHIRPS/ERA5 projections.</p>
+        <div class="wrsi-bar" style="height: 12px; border-radius: 6px; background: rgba(255,255,255,0.05); margin: 15px 0;">
+          <div id="wrsi-base-fill" style="height:100%; width:0%; background:#FF4F4F; border-radius:6px; transition:width 0.8s;"></div>
+        </div>
+      </div>
+
+      <div class="card glass" style="border-bottom: 3px solid #00F0FF;">
+        <div class="card-top ct-cyan"></div>
+        <div class="sec-label"><i class="fa-solid fa-bolt"></i> Optimized WRSI (Solar-Irrigated)</div>
+        <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:6px;">
+          <span id="wrsi-opt-big" style="font-family:var(--cab);font-size:48px;font-weight:900;color:var(--cyan);">--</span>
+          <span id="tag-opt" class="ptag">--</span>
+        </div>
+        <p class="desc-text" style="font-size:11px;">Adjusted satisfaction after 3.3 MW solar-powered intervention.</p>
+        <div class="wrsi-bar" style="height: 12px; border-radius: 6px; background: rgba(255,255,255,0.05); margin: 15px 0;">
+          <div id="wrsi-opt-fill" style="height:100%; width:0%; background:var(--cyan); border-radius:6px; transition:width 0.8s;"></div>
+        </div>
+      </div>
+    </div>
+
+
+  </div>
+
+  <!-- MEMBER SUCCESS LEDGER PANEL -->
+  <div id="p-ledger" class="panel">
+    <div class="card glass">
+      <div class="card-top ct-gold"></div>
+      <div class="sec-label"><i class="fa-solid fa-users-viewfinder"></i> AGRIAdapt 2025 Member Registration & Success Registry</div>
+      
+      <!-- New Registration Form -->
+      <div class="reg-form">
+        <div>
+          <span class="reg-label">Full Name</span>
+          <input type="text" id="reg-name" class="reg-input" placeholder="e.g. Jean Bosco">
+        </div>
+        <div>
+          <span class="reg-label">Sector</span>
+          <select id="reg-sector" class="reg-input">
+            <option>Nasho</option><option>Mpanga</option><option>Gahara</option><option>Gatore</option><option>Mahama</option><option>Kigina</option>
+          </select>
+        </div>
+        <div>
+          <span class="reg-label">Hectares / Crop</span>
+          <div style="display:flex; gap:5px;">
+            <input type="number" id="reg-ha" class="reg-input" placeholder="Ha" style="width:70px;">
+            <select id="reg-crop" class="reg-input">
+              <option>Maize</option><option>Beans</option><option>Vegetables</option><option>Coffee</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn btn-g" onclick="registerMember()" style="height:42px;">Register & Add to Ledger</button>
+      </div>
+
+      <div style="max-height: 500px; overflow-y: auto; margin-top: 10px;" class="inner-glass">
+        <table class="ledger-table">
+          <thead>
+            <tr>
+                <th style="text-align:left;">Member Name</th>
+                <th style="text-align:left;">Sector</th>
+                <th style="text-align:left;">Asset Volume</th>
+                <th style="text-align:left;">Population</th>
+                <th style="text-align:left;">WRSI Health</th>
+                <th style="text-align:left;">Economic Yield</th>
+                <th style="text-align:left;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ledger-body"></tbody>
+        </table>
+      </div>
+      <p class="desc-text mt-15">
+        Displaying high-priority members based on mid-season water requirements. Payouts are auto-calculated for Season B.
+      </p>
+    </div>
+  </div>
+
+  <!-- GRID ECONOMICS PANEL (The Community Ledger) -->
+  <div id="p-finance" class="panel">
+    <div class="card glass" style="margin-bottom:24px; border-left:4px solid var(--cyan); padding: 32px;">
+        <div class="sec-label" style="color:var(--cyan); margin-bottom: 30px; font-size:12px;"><i class="fa-solid fa-code-branch"></i> The Solar-Economic Pipeline</div>
+        <div class="eco-stepper">
+            <div class="eco-step">
+                <div class="es-icon" style="color:var(--red);"><i class="fa-solid fa-microchip"></i></div>
+                <div class="es-title">1. ML Brain Predicts</div>
+                <div class="es-desc">The XGBoost engine tracks soil moisture drop and sounds the alarm.</div>
+            </div>
+            <div class="es-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+            <div class="eco-step">
+                <div class="es-icon" style="color:var(--cyan);"><i class="fa-solid fa-solar-panel"></i></div>
+                <div class="es-title">2. Free Solar Muscle</div>
+                <div class="es-desc">Instead of burning diesel, the 3.3 MW solar grid pumps water for free.</div>
+            </div>
+            <div class="es-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+            <div class="eco-step">
+                <div class="es-icon" style="color:var(--gold);"><i class="fa-solid fa-wheat-awn"></i></div>
+                <div class="es-title">3. Harvest Saved</div>
+                <div class="es-desc">Crops get water exactly when needed. A massive yield is secured.</div>
+            </div>
+            <div class="es-arrow"><i class="fa-solid fa-chevron-right"></i></div>
+            <div class="eco-step">
+                <div class="es-icon" style="color:var(--green);"><i class="fa-solid fa-sack-dollar"></i></div>
+                <div class="es-title">4. Shared Dividend</div>
+                <div class="es-desc">Farmers keep the profits. Wealth is distributed community-wide.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card glass" style="margin-bottom:24px; border-top:1px solid rgba(255,255,255,0.05);">
+        <div class="sec-label"><i class="fa-solid fa-map-location-dot"></i> 1a. Geographical Revenue Breakdown (Real-Time)</div>
+        <div id="sector-economy-stats" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:10px; margin-top:15px;">
+            <!-- Sector blocks injected via JS -->
+        </div>
+    </div>
+
+    <div class="card glass" style="margin-bottom:24px;">
+      <div class="card-top ct-green"></div>
+      <div class="sec-label" style="color:var(--green);"><i class="fa-solid fa-seedling"></i> 1. Gross Harvest Revenue (Base Income)</div>
+      <div style="font-family:var(--cab); font-size:36px; font-weight:900; color:var(--green); margin:10px 0;" id="fin-gross-revenue">-- RWF</div>
+      <div style="font-size:11px; color:var(--ink-soft); line-height:1.5;">Mathematical Source: <code style="color:var(--cyan); background:rgba(0,0,0,0.3); padding:2px 4px; border-radius:3px;">Total Hectares × Crop Potential Yield × Optimized WRSI Health × Market Price</code>. This is total raw market value generated from the crops before deducting any operational costs.</div>
+    </div>
+
+    <div class="g2">
+      <div class="card glass">
+        <div class="card-top ct-red"></div>
+        <div class="sec-label" style="color:var(--red)"><i class="fa-solid fa-minus"></i> 2. Running Expenses (Grid Upkeep)</div>
+        <div class="sl-group">
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span style="color:var(--ink-soft); font-size:12px;">Solar Grid (Cleaning & Inverters)</span>
+                <span id="fin-solar-cost" style="font-family:var(--mono);">-- RWF</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span style="color:var(--ink-soft); font-size:12px;">Battery Nexus Maintenance</span>
+                <span id="fin-battery-cost" style="font-family:var(--mono);">-- RWF</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                <span style="color:var(--ink-soft); font-size:12px;">Sprinkler Mechanical Wear</span>
+                <span id="fin-pivot-cost" style="font-family:var(--mono);">-- RWF</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding-top:12px; border-top:1px solid var(--border);">
+                <span style="font-weight:700;">Total District Expenses</span>
+                <span id="fin-total-opex" style="font-family:var(--mono); color:var(--red);">-- RWF</span>
+            </div>
+        </div>
+      </div>
+      <div class="card glass">
+        <div class="card-top ct-gold"></div>
+        <div class="sec-label" style="color:var(--gold);"><i class="fa-solid fa-equals"></i> 3. Net Community Profit (Take-Home)</div>
+        <div style="text-align:center; padding:20px 0;">
+            <div style="font-size:11px; color:var(--ink-soft); margin-bottom:5px;">TOTAL COOPERATIVE PROFIT</div>
+            <div id="fin-net-profit" style="font-family:var(--cab); font-size:42px; font-weight:900; color:var(--green);">-- RWF</div>
+            <div style="font-size:10px; color:var(--ink-mute); margin-top:10px;">AFTER DEDUCTING ALL RUNNING COSTS</div>
+            
+            <div style="margin-top:25px; background:rgba(0,255,102,0.05); padding:15px; border-radius:12px; border:1px solid rgba(0,255,102,0.1);">
+                <div style="font-size:10px; color:var(--green); font-weight:800; letter-spacing:0.1em;">PER HOUSEHOLD DIVIDEND</div>
+                <div id="fin-per-household" style="font-size:24px; font-weight:800; color:white; margin:5px 0;">-- RWF</div>
+                <div style="font-size:10px; color:var(--ink-soft);">Paid directly to 2,099 members</div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ASSET MAP PANEL (Interactive GIS) -->
+  <div id="p-map" class="panel">
+    <div class="card glass" style="padding:0; overflow:hidden; position:relative;">
+      <!-- Map Toolbar -->
+      <div id="map-toolbar" class="glass" style="position:absolute; top:20px; left:20px; z-index:1000; padding:12px; border-radius:12px; display:flex; gap:10px; align-items:center;">
+          <div style="position:relative;">
+              <button class="btn btn-mini active" onclick="document.getElementById('shp-upload').click()"><i class="fa-solid fa-file-import"></i> Import Shapefile (.zip)</button>
+              <input type="file" id="shp-upload" style="display:none;" accept=".zip" onchange="handleMapUpload(event)">
+          </div>
+          <div style="height:20px; width:1px; background:rgba(255,255,255,0.1);"></div>
+          <div id="geocoder-input-wrapper"></div>
+      </div>
+      
+      <!-- Leaflet Map Container -->
+      <div id="map" style="width:100%; height:600px; background:#04060b;"></div>
+
+      <!-- NEW: Map-Based Crop Selector Overlay -->
+      <div id="gis-study-nexus" class="glass" style="display:none; position:absolute; top:20px; right:20px; z-index:1100; padding:20px; border-radius:16px; width:220px; border-left:3px solid var(--gold);">
+          <div class="sec-label" style="font-size:10px; color:var(--gold);"><i class="fa-solid fa-flask"></i> FIELD STUDY ANALYSIS</div>
+          <div id="study-area-stats" style="font-family:var(--cab); font-size:18px; margin:10px 0;">-- ha</div>
+          
+          <div style="font-size:10px; color:var(--ink-soft); margin-bottom:5px;">STAKEHOLDER NAME:</div>
+          <input type="text" id="study-name" class="reg-input" placeholder="e.g. Marie Mukasa" style="margin-bottom:12px; width:100%;">
+          
+          <div style="font-size:10px; color:var(--ink-soft); margin-bottom:5px;">SELECT CROP TARGET:</div>
+          <select id="study-crop" class="reg-input" style="margin-bottom:15px; width:100%;">
+              <option>Maize</option><option>Beans</option><option>Vegetables</option><option>Coffee</option>
+          </select>
+          <button class="btn btn-g" onclick="saveStudyToLedger()" style="width:100%; font-size:11px;">Save to Success Ledger</button>
+          <button class="btn-mini" onclick="cancelStudy()" style="width:100%; margin-top:8px;">Discard Area</button>
+      </div>
+
+      <div class="glass" style="position:absolute; bottom:24px; left:24px; padding:20px; border-left:3px solid var(--cyan); z-index:1000;">
+          <div class="sec-label" style="font-size:10px; margin-bottom:4px; color:var(--cyan);">KIREHE GIS HUB</div>
+          <div style="font-family:var(--serif); font-size:20px;">Asset Map &amp; Spatial Analysis</div>
+          <div id="map-status" style="font-size:11px; color:var(--ink-soft); margin-top:4px;">Awaiting Shapefile import or location search...</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════ -->
+    <!-- SPECTRAL INTELLIGENCE HUB -->
+    <!-- ═══════════════════════════════════════════ -->
+    <div class="card glass" id="spectral-card-container" style="margin-top:24px; border-top:2px solid var(--cyan); position:relative; overflow:hidden;">
+      <div class="card-top ct-cyan"></div>
+
+      <!-- SPATIAL GATING LOCK OVERLAY -->
+      <div id="spectral-lock-overlay" style="position:absolute; inset:0; z-index:1000; background:rgba(10,15,25,0.92); display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px; backdrop-filter:blur(6px); transition:all 0.5s cubic-bezier(0.4, 0, 0.2, 1); border-radius:12px;">
+         <div style="font-size:48px; color:rgba(0,240,255,0.1); margin-bottom:20px;"><i class="fa-solid fa-map-location-dot"></i></div>
+         <div style="color:var(--gold); font-weight:900; font-size:15px; text-transform:uppercase; letter-spacing:0.15em;">Spatial Lock Active</div>
+         <div style="color:var(--ink-soft); font-size:12px; margin-top:10px; line-height:1.7; max-width:280px; font-family:var(--serif);">Satellite analysis requires a target boundary. Draw a study area or upload a shapefile to unlock the Spectral Engine.</div>
+         <button class="btn btn-mini" style="margin-top:25px; border-color:var(--cyan); color:var(--cyan); padding:8px 20px; font-weight:bold;" onclick="tab('map'); window.scrollTo(0,0);">Open Asset Map Tools</button>
+      </div>
+
+      <div class="sec-label" style="display:flex; align-items:center; justify-content:space-between;">
+          <span><i class="fa-solid fa-satellite-dish"></i> Spectral Intelligence Hub</span>
+          <span style="font-size:9px; background:rgba(0,240,255,0.1); color:var(--cyan); padding:2px 10px; border-radius:12px; border:1px solid rgba(0,240,255,0.2); font-family:var(--mono); font-weight:bold;">SPATIAL ENGINE LOCK</span>
+      </div>
+      <p style="font-size:12px; color:var(--ink-soft); margin:6px 0 0 0; line-height:1.6;">Compute <strong>NDVI</strong>, <strong>NDWI</strong> &amp; <strong>SPI</strong> from real Sentinel-2 bands, live simulation data, or NASA satellite streams. Generates automatic AI interpretation of current field state. Only active for selected study areas.</p>
+
+      <!-- MODE SELECTOR -->
+      <div style="display:flex; gap:8px; margin-top:20px; flex-wrap:wrap;">
+        <button id="mode-sim"    class="btn btn-mini active" onclick="setSpectralMode('sim')"><i class="fa-solid fa-bolt"></i> Quick Sim</button>
+        <button id="mode-upload" class="btn btn-mini"        onclick="setSpectralMode('upload')"><i class="fa-solid fa-file-import"></i> Upload Bands</button>
+        <button id="mode-online" class="btn btn-mini"        onclick="setSpectralMode('online')"><i class="fa-solid fa-satellite"></i> Online Source</button>
+      </div>
+
+      <div style="margin-top:20px;">
+      <!-- SHARED SPECTRAL ADJUSTERS (Always visible) -->
+      <div class="inner-glass" style="padding:18px; margin-top:20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+          <div style="font-size:11px; color:var(--ink-soft); line-height:1.7;">Drag to adjust indices based on visual satellite evidence or simulation needs.</div>
+          <div id="spectral-live-badge" style="font-size:9px; font-family:var(--mono); background:rgba(0,255,102,0.1); color:var(--green); padding:3px 10px; border-radius:20px; border:1px solid rgba(0,255,102,0.3); white-space:nowrap; margin-left:12px;">⬤ LIVE SYNC</div>
+        </div>
+
+        <div class="sl-row" style="margin-bottom:16px;">
+          <div class="sl-name"><strong style="color:#7FDB00;">NDVI</strong><span>Vegetation Density</span></div>
+          <input type="range" id="sp-ndvi" min="-1" max="1" step="0.01" value="0.48" oninput="onSpectralSlider()">
+          <span class="sl-val" id="sp-ndvi-val" style="color:#7FDB00; width:60px;">0.480</span>
+        </div>
+
+        <div class="sl-row" style="margin-bottom:16px;">
+          <div class="sl-name"><strong style="color:#00AAFF;">NDWI</strong><span>Water Content</span></div>
+          <input type="range" id="sp-ndwi" min="-1" max="1" step="0.01" value="0.05" oninput="onSpectralSlider()">
+          <span class="sl-val" id="sp-ndwi-val" style="color:#00AAFF; width:60px;">0.050</span>
+        </div>
+
+        <div class="sl-row" style="margin-bottom:16px;">
+          <div class="sl-name"><strong style="color:#FBBF24;">SPI</strong><span>Drought Index</span></div>
+          <input type="range" id="sp-spi" min="-3" max="3" step="0.1" value="-0.4" oninput="onSpectralSlider()">
+          <span class="sl-val" id="sp-spi-val" style="color:#FBBF24; width:60px;">-0.40</span>
+        </div>
+
+        <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:10px;">
+          <button class="btn-mini" onclick="onSpectralSlider()"><i class="fa-solid fa-rotate"></i> Refresh Results</button>
+          <button class="btn-mini" onclick="resetSpectralToSim()" style="color:var(--cyan); border-color:rgba(0,240,255,0.3);"><i class="fa-solid fa-arrows-rotate"></i> Sync Dashboard</button>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;">
+        <!-- QUICK SIM MODE -->
+        <div id="spectral-sim">
+          <div class="inner-glass" style="padding:15px; border-left:3px solid var(--green);">
+            <div style="font-size:11px; color:var(--ink-soft);">Mode: <strong>Simulation Shadow</strong>. Indices currently following dashboard weather inputs.</div>
+          </div>
+        </div>
+
+        <!-- UPLOAD BANDS MODE -->
+        <div id="spectral-upload" style="display:none;">
+          <div class="inner-glass" style="padding:18px;">
+            <div style="font-size:11px; color:var(--ink-soft); margin-bottom:16px; line-height:1.7;">Upload <strong>Sentinel-2 Bands</strong> to overlay real imagery and calculate pixel-level averages.</div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px;">
+              <div class="inner-glass" style="padding:12px; text-align:center;">
+                <div style="font-size:10px; color:#FF6B6B; text-transform:uppercase; margin-bottom:8px;">🔴 Red Band (B04)</div>
+                <input type="file" id="band-red-file" accept=".tif,.tiff" onchange="loadBand(this.files[0], 'red')" style="display:none;">
+                <button class="btn-mini" onclick="document.getElementById('band-red-file').click()">Upload B04</button>
+                <div id="band-red-status" style="font-size:9px; color:var(--ink-mute); margin-top:6px;">Not loaded</div>
+              </div>
+              <div class="inner-glass" style="padding:12px; text-align:center;">
+                <div style="font-size:10px; color:var(--green); text-transform:uppercase; margin-bottom:8px;">🌿 NIR Band (B08)</div>
+                <input type="file" id="band-nir-file" accept=".tif,.tiff" onchange="loadBand(this.files[0], 'nir')" style="display:none;">
+                <button class="btn-mini" onclick="document.getElementById('band-nir-file').click()">Upload B08</button>
+                <div id="band-nir-status" style="font-size:9px; color:var(--ink-mute); margin-top:6px;">Not loaded</div>
+              </div>
+              <div class="inner-glass" style="padding:12px; text-align:center;">
+                <div style="font-size:10px; color:#00AAFF; text-transform:uppercase; margin-bottom:8px;">🟢 Green Band (B03)</div>
+                <input type="file" id="band-green-file" accept=".tif,.tiff" onchange="loadBand(this.files[0], 'green')" style="display:none;">
+                <button class="btn-mini" onclick="document.getElementById('band-green-file').click()">Upload B03 (opt)</button>
+                <div id="band-green-status" style="font-size:9px; color:var(--ink-mute); margin-top:6px;">Not loaded</div>
+              </div>
+            </div>
+            <button class="btn btn-g" onclick="computeBandIndex()"><i class="fa-solid fa-calculator"></i> Compute Indices &amp; Display Map Overlay</button>
+          </div>
+        </div>
+
+        <!-- ONLINE SOURCE MODE -->
+        <div id="spectral-online" style="display:none;">
+          <div class="inner-glass" style="padding:18px;">
+            <div style="font-size:11px; color:var(--ink-soft); margin-bottom:16px; line-height:1.7;">Streams <strong>MODIS Terra NDVI</strong> or <strong>Land Surface Temperature</strong> directly onto Kirehe via <strong>NASA GIBS WMS</strong> — free, no API key required.</div>
+            <div class="g2" style="gap:12px; margin-bottom:16px;">
+              <div>
+                <div style="font-size:10px; color:var(--ink-soft); margin-bottom:6px;">📅 ACQUISITION DATE</div>
+                <input type="month" id="online-date" class="reg-input" value="2024-03" style="font-family:var(--mono);">
+              </div>
+              <div>
+                <div style="font-size:10px; color:var(--ink-soft); margin-bottom:6px;">🛰 DATA LAYER</div>
+                <select id="online-layer" class="reg-input">
+                  <optgroup label="MODIS (Global Daily/Monthly)">
+                    <option value="MODIS_Terra_L3_NDVI_Monthly">MODIS NDVI (Terra Monthly)</option>
+                    <option value="MODIS_Terra_Land_Surface_Temp_Day">Land Surface Temp (Day)</option>
+                    <option value="MODIS_Terra_Vegetation_Indices_Monthly">Vegetation Indices (EVI)</option>
+                  </optgroup>
+                  <optgroup label="Landsat (High-Res 30m)">
+                    <option value="Landsat_WELD_NDVI_Global_Annual">Landsat WELD NDVI (Annual Peak)</option>
+                    <option value="Landsat9_L1_Natural_Color">Landsat 9 True Color</option>
+                    <option value="Landsat8_L1_Natural_Color">Landsat 8 True Color</option>
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-g" onclick="fetchOnlineNDVI()"><i class="fa-solid fa-satellite"></i> Load NASA Layer &amp; Analyse</button>
+            <div id="online-status" style="margin-top:12px; font-size:11px; color:var(--ink-soft); font-family:var(--mono);"></div>
+          </div>
+        </div>
+
+        <!-- RESULTS PANEL -->
+        <div id="spectral-results" style="display:none; margin-top:20px;">
+          <div class="sec-label" style="margin-bottom:14px; color:var(--gold);"><i class="fa-solid fa-chart-bar"></i> Analysis Results</div>
+          <div id="spectral-results-content"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ECONOMIC ROI PANEL (Benefit Verification) -->
+  <div id="p-impact" class="panel">
+    <div class="benefit-grid">
+        <!-- BASELINE -->
+        <div class="benefit-col baseline">
+            <div class="sec-label" style="color:var(--red); font-size:11px;"><i class="fa-solid fa-triangle-exclamation"></i> STATUS QUO (Rain-fed Only)</div>
+            <h3 style="font-family:var(--cab); font-size:32px; margin:15px 0;">Baseline Stress</h3>
+            <img id="img-stressed" src="stressed_maize_rwanda_1775826357787.png" style="width:100%; height:180px; object-fit:cover; border-radius:12px; margin-bottom:20px;">
+            
+            <div style="margin-bottom:20px;">
+                <div style="font-size:10px; color:var(--ink-soft);">ESTIMATED SEASONAL INCOME</div>
+                <div id="imp-rwf-base" style="font-size:32px; font-weight:900; family:var(--cab); color:white;">-- RWF</div>
+            </div>
+            
+            <div class="sci-meta" title="CHIRPS v2.0 Satellite - 22 Year Rainfall Context">
+                <i class="fa-solid fa-cloud-showers-heavy"></i> CHIRPS Satellite (Rainfall Records)
+            </div>
+        </div>
+
+        <!-- OPTIMIZED -->
+        <div class="benefit-col optimized">
+            <div class="sec-label" style="color:var(--green); font-size:11px;"><i class="fa-solid fa-bolt"></i> AGRIAdapt (ML-Intervention)</div>
+            <h3 style="font-family:var(--cab); font-size:32px; margin:15px 0; color:var(--cyan);">Verified Benefit</h3>
+            <img id="img-healthy" src="healthy_maize_rwanda_1775826339710.png" style="width:100%; height:180px; object-fit:cover; border-radius:12px; margin-bottom:20px;">
+            
+            <div style="margin-bottom:10px;">
+                <div style="font-size:10px; color:var(--ink-soft);">OPTIMIZED SEASONAL INCOME</div>
+                <div id="imp-rwf" style="font-size:32px; font-weight:900; family:var(--cab); color:var(--green);">-- RWF</div>
+                <div class="delta-pill" id="imp-delta">+--% Surplus</div>
+            </div>
+
+            <div class="sci-meta" title="ERA5-Land - 9km Resolution Global Soil Moisture Grid">
+                <i class="fa-solid fa-droplet"></i> ERA5 Grid (Daily Soil Health Data)
+            </div>
+        </div>
+    </div>
+
+    <div class="card glass" style="margin-top:24px; text-align:center; padding:28px;">
+        <div class="sec-label" style="justify-content:center; margin-bottom:20px;"><i class="fa-solid fa-coins"></i> Total District Performance (AGRIAdapt 2025 SEASON FORECAST)</div>
+        <div style="display:flex;justify-content:center;gap:48px;flex-wrap:wrap;">
+            <div style="text-align:center;"><div style="font-size:36px;font-weight:900;font-family:var(--cab);color:#00FF66;" id="imp-rwf-total">--</div><div style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);">RWF Profit / Year</div></div>
+            <div style="text-align:center;"><div style="font-size:36px;font-weight:900;font-family:var(--cab);color:#00F0FF;" id="imp-kg">10,000</div><div style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);">Metric Tons of Harvest</div></div>
+            <div style="text-align:center;"><div style="font-size:36px;font-weight:900;font-family:var(--cab);color:#FBBF24;" id="imp-weeks">619,000</div><div style="font-family:var(--mono);font-size:11px;color:var(--ink-soft);">RWF per member (Avg)</div></div>
+        </div>
+    </div>
+  </div>
+
+  <!-- VALIDATION LAB PANEL -->
+  <div id="p-model" class="panel">
+    <div class="g2">
+      <div class="card glass">
+        <div class="card-top ct-cyan"></div>
+        <div class="sec-label"><i class="fa-solid fa-microscope"></i> XGBoost Confusion Matrix (2001-2023)</div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:20px;">
+           <div class="inner-glass" style="padding:15px; text-align:center;">
+              <div style="font-size:10px; color:var(--ink-soft);">TP (Predicted Failure)</div>
+              <div style="font-size:24px; font-weight:900; color:var(--green);">0.84</div>
+           </div>
+           <div class="inner-glass" style="padding:15px; text-align:center;">
+              <div style="font-size:10px; color:var(--ink-soft);">FP (Type I Error)</div>
+              <div style="font-size:24px; font-weight:900; color:var(--red);">0.12</div>
+           </div>
+           <div class="inner-glass" style="padding:15px; text-align:center;">
+              <div style="font-size:10px; color:var(--ink-soft);">FN (Type II Error)</div>
+              <div style="font-size:24px; font-weight:900; color:var(--red);">0.08</div>
+           </div>
+           <div class="inner-glass" style="padding:15px; text-align:center;">
+              <div style="font-size:10px; color:var(--ink-soft);">TN (Predicted Normal)</div>
+              <div style="font-size:24px; font-weight:900; color:var(--green);">0.92</div>
+           </div>
+        </div>
+        <div class="desc-text mt-15">AUC-ROC of 0.853 with F1-Score of 0.81.</div>
+      </div>
+      <div class="card glass">
+          <div class="card-top ct-gold"></div>
+          <div class="sec-label"><i class="fa-solid fa-chart-column"></i> Global Feature Selection (SHAP)</div>
+          <div id="shap-summary" style="margin-top:20px;"></div>
+          <p class="desc-text mt-15">Feature importance ranking based on 22 seasons of Kirehe data.</p>
+      </div>
+    </div>
+  </div>
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- INDIVIDUAL RESULTS & ANALYSIS HUB -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="p-analysis" class="panel">
+    <div class="card glass">
+      <div class="card-top ct-gold"></div>
+      <div class="sec-label" style="display:flex; align-items:center; justify-content:space-between;">
+          <span><i class="fa-solid fa-chart-pie"></i> Member Productivity & Analysis Matrix</span>
+          <div style="display:flex; gap:10px;">
+              <button class="btn btn-mini" onclick="exportAnalysisFull('csv')"><i class="fa-solid fa-file-csv"></i> Export CSV</button>
+              <button class="btn btn-mini" onclick="exportAnalysisFull('json')"><i class="fa-solid fa-file-code"></i> Export JSON</button>
+              <button class="btn btn-mini" onclick="renderAnalysisHub()"><i class="fa-solid fa-rotate"></i> Refresh Analysis</button>
+          </div>
+      </div>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:10px;">Deep-dive into individual stakeholder performance. These metrics compare <strong>Baseline (Rain-fed)</strong> against <strong>Optimized (Solar-Irrigated)</strong> results across all registered fields.</p>
+      
+      <!-- DISTRICT SUMMARY HUB -->
+      <div id="analysis-summary-hub" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; margin-top:25px; padding:20px; background:rgba(0,0,0,0.2); border-radius:16px; border:1px solid rgba(255,255,255,0.05);">
+          <!-- Stats injected by JS -->
+      </div>
+
+      <!-- FILTER CONTROLS -->
+      <div class="analysis-controls" style="display:flex; flex-wrap:wrap; gap:15px; margin-top:25px; align-items:center; padding-bottom:20px; border-bottom:1px solid var(--border);">
+          <div style="flex:1; min-width:260px; position:relative;">
+              <i class="fa-solid fa-magnifying-glass" style="position:absolute; left:12px; top:13px; color:var(--ink-mute); font-size:12px;"></i>
+              <input type="text" id="analysis-search" class="reg-input" placeholder="Search Stakeholder Name..." style="padding-left:35px;" oninput="renderAnalysisHub()">
+          </div>
+          <div style="display:flex; gap:10px;">
+              <select id="analysis-filter-sector" class="reg-input" style="width:140px;" onchange="renderAnalysisHub()">
+                  <option value="all">All Sectors</option>
+                  <option>Nasho</option><option>Mpanga</option><option>Gahara</option><option>Gatore</option>
+                  <option>Kigarama</option><option>Kigina</option><option>Mahama</option><option>Musaza</option>
+                  <option>Mushikiri</option><option>Nyamugari</option><option>Nyarubuye</option><option>Kirehe</option>
+              </select>
+              <select id="analysis-filter-risk" class="reg-input" style="width:140px;" onchange="renderAnalysisHub()">
+                  <option value="all">All Risk Levels</option>
+                  <option value="high">High Health (>80%)</option>
+                  <option value="med">Recovering (70-80%)</option>
+                  <option value="low">Critical Risk (<70%)</option>
+              </select>
+          </div>
+      </div>
+
+      
+      <div id="analysis-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:24px; margin-top:30px;">
+          <!-- Analysis Cards Injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- INDIVIDUAL EXPORT & ANALYSIS HUB -->
+  <!-- ═══════════════════════════════════════════ -->
+  <div id="p-export" class="panel">
+    <div class="card glass">
+      <div class="card-top ct-cyan"></div>
+      <div class="sec-label" style="display:flex; align-items:center; justify-content:space-between;">
+          <span><i class="fa-solid fa-file-pdf"></i> Individual Analysis Export Hub</span>
+          <button class="btn btn-mini" onclick="renderExportHub()"><i class="fa-solid fa-rotate"></i> Refresh List</button>
+      </div>
+      <p style="font-size:12px; color:var(--ink-soft); margin-top:10px;">Generate high-fidelity Field Analysis Reports for individual stakeholders. Reports combine satellite indices (NDVI/SPI), GIS boundaries, and ML-driven profitability forecasts.</p>
+      
+      <div id="export-grid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:20px; margin-top:30px;">
+          <!-- Export Cards Injected by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- HIDDEN PRINT TEMPLATE (A4 Styled) -->
+  <div id="print-area" style="display:none;">
+      <div id="report-template" style="width:210mm; min-height:297mm; background:white; color:#111; padding:40px; font-family:'Inter', sans-serif; position:relative;">
+          <!-- HEADER -->
+          <div style="display:flex; justify-content:space-between; align-items:start; border-bottom:4px solid #00F0FF; padding-bottom:20px;">
+              <div>
+                  <div style="font-weight:900; font-size:28px; letter-spacing:-1px;">AGRI<span style="color:#0080FF;">Adapt</span></div>
+                  <div style="font-size:10px; text-transform:uppercase; font-weight:700; color:#666; letter-spacing:1px; margin-top:4px;">Field Analysis & Intelligence Report</div>
+              </div>
+              <div style="text-align:right;">
+                  <div style="font-size:10px; font-weight:800; color:#999;">REFERENCE ID</div>
+                  <div id="rpt-id" style="font-weight:bold; font-size:14px;">K-CERT-XXXX</div>
+              </div>
+          </div>
+
+          <!-- STAKEHOLDER BANNER -->
+          <div style="display:flex; gap:30px; margin-top:30px; background:#f8faff; padding:25px; border-radius:12px;">
+              <div style="flex:1;">
+                  <div style="font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:700;">Stakeholder Name</div>
+                  <div id="rpt-name" style="font-size:24px; font-weight:900; margin-top:5px;">-- --</div>
+                  <div id="rpt-sector" style="font-size:14px; color:#4b5563; margin-top:2px;">-- Sector</div>
+              </div>
+              <div style="text-align:right; border-left:1px solid #e5e7eb; padding-left:30px;">
+                  <div style="font-size:10px; color:#6b7280; text-transform:uppercase; font-weight:700;">Property Size</div>
+                  <div id="rpt-ha" style="font-size:24px; font-weight:900; margin-top:5px;">0.00 ha</div>
+                  <div id="rpt-crop" style="font-size:14px; font-weight:700; color:#0080FF;">-- Crop</div>
+              </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; margin-top:30px;">
+              <!-- SECTION: SPECTRAL INTELLIGENCE -->
+              <div>
+                  <h4 style="font-size:12px; border-bottom:1px solid #eee; padding-bottom:10px; text-transform:uppercase; color:#111;">Satellite Spectral Analysis</h4>
+                  <div style="margin-top:15px; display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                      <div style="background:#f3f4f6; padding:15px; border-radius:8px;">
+                          <div style="font-size:9px; color:#666;">NDVI (Veg)</div>
+                          <div id="rpt-ndvi" style="font-size:18px; font-weight:800;">0.00</div>
+                      </div>
+                      <div style="background:#f3f4f6; padding:15px; border-radius:8px;">
+                          <div style="font-size:9px; color:#666;">SPI (Rain)</div>
+                          <div id="rpt-spi" style="font-size:18px; font-weight:800;">0.00</div>
+                      </div>
+                  </div>
+                  <div style="margin-top:20px; padding:15px; background:#fffbf0; border-radius:8px; border:1px solid #fef3c7;">
+                      <div style="font-size:10px; font-weight:800; color:#92400e; margin-bottom:5px;">AI INTERPRETATION</div>
+                      <p id="rpt-ai" style="font-size:11px; line-height:1.6; color:#78350f; margin:0;">Analysis pending...</p>
+                  </div>
+              </div>
+
+              <!-- SECTION: FINANCIAL FORECAST -->
+              <div>
+                  <h4 style="font-size:12px; border-bottom:1px solid #eee; padding-bottom:10px; text-transform:uppercase; color:#111;">ML Performance Forecast</h4>
+                  <div style="margin-top:15px;">
+                      <div style="font-size:10px; color:#666;">VITALITY INDEX (WRSI)</div>
+                      <div id="rpt-wrsi" style="font-size:42px; font-weight:900; color:#10b981;">0%</div>
+                  </div>
+                  <div style="margin-top:20px; border-top:2px solid #10b981; padding-top:10px;">
+                      <div style="font-size:10px; font-weight:800;">ESTIMATED SEASONAL REVENUE</div>
+                      <div id="rpt-rev" style="font-size:28px; font-weight:900; color:#065f46;">-- RWF</div>
+                  </div>
+              </div>
+          </div>
+
+          <!-- FOOTER / STAMP / SIGNATURE -->
+          <div style="margin-top:auto; position:absolute; bottom:40px; left:40px; right:40px; display:flex; justify-content:space-between; align-items:end; border-top:1px solid #eee; padding-top:20px;">
+              <div style="font-size:9px; color:#999; max-width:350px; line-height:1.4;">
+                  This analysis is generated by the AGRIAdapt ML engine using CHIRPS Rainfall and MODIS NDVI satellite products. Precision +/- 92.4%. Verified for Kirehe District Season B 2025.
+              </div>
+              <div style="display:flex; gap:40px; align-items:end;">
+                  <div style="text-align:center;">
+                      <div style="width:160px; border-bottom:1px solid #111; margin-bottom:5px; height:40px;"></div>
+                      <div style="font-size:9px; font-weight:700; color:#666; text-transform:uppercase;">Authorized Signature</div>
+                  </div>
+                  <div style="text-align:right;">
+                      <div style="width:80px; height:80px; border:2px dashed #eee; display:flex; align-items:center; justify-content:center; font-size:9px; color:#ccc; border-radius:50%;">Stamp</div>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+
+</div>
+
+<footer class="footer">
+  <strong>AGRIAdapt: Kirehe District ML Decision Support System</strong> · Season B 2001–2023 Study · Powered by Howard G. Buffett Foundation
+</footer>
+
+<script src="script.js?v=8"></script>
+</body>
+</html>
